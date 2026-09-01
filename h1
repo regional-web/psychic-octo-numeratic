@@ -1,0 +1,904 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+--==================================================
+-- SETTINGS
+--==================================================
+
+local HEAD_SIZE = 8
+local HEAD_TRANSPARENCY = 0.8
+
+local ENABLED = true
+local TEAM_CHECK_ENABLED = true
+
+local KNIFE_CHECK_ENABLED = true
+local MUSKET_CHECK_ENABLED = true
+
+local KNIFE_NAME = "Knife"
+local MUSKET_NAME = "Musket"
+
+local UPDATE_INTERVAL = 0.05
+
+local originalHeads = {}
+
+--==================================================
+-- GUI CLEANUP
+--==================================================
+
+local oldGui = PlayerGui:FindFirstChild("HeadExpanderGUI")
+
+if oldGui then
+    oldGui:Destroy()
+end
+
+--==================================================
+-- MAIN GUI
+--==================================================
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "HeadExpanderGUI"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = PlayerGui
+
+--==================================================
+-- FLOATING OPEN/CLOSE BUTTON
+--==================================================
+
+local toggle = Instance.new("TextButton")
+toggle.Name = "Toggle"
+toggle.Size = UDim2.fromOffset(42, 42)
+toggle.Position = UDim2.new(0.5, -21, 0.5, -21)
+toggle.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+toggle.TextColor3 = Color3.fromRGB(210, 210, 210)
+toggle.Text = "●"
+toggle.TextSize = 16
+toggle.BorderSizePixel = 0
+toggle.AutoButtonColor = false
+toggle.Active = true
+toggle.Parent = gui
+
+local toggleStroke = Instance.new("UIStroke")
+toggleStroke.Color = Color3.fromRGB(70, 70, 70)
+toggleStroke.Thickness = 1
+toggleStroke.Parent = toggle
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(1, 0)
+toggleCorner.Parent = toggle
+
+--==================================================
+-- MAIN WINDOW
+--==================================================
+
+local panel = Instance.new("Frame")
+panel.Name = "Main"
+panel.Size = UDim2.fromOffset(360, 240)
+panel.Position = UDim2.new(0.5, -180, 0.5, 35)
+panel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+panel.BorderSizePixel = 0
+panel.Parent = gui
+
+local panelStroke = Instance.new("UIStroke")
+panelStroke.Color = Color3.fromRGB(75, 75, 75)
+panelStroke.Thickness = 1
+panelStroke.Parent = panel
+
+local panelCorner = Instance.new("UICorner")
+panelCorner.CornerRadius = UDim.new(0, 5)
+panelCorner.Parent = panel
+
+--==================================================
+-- TITLE BAR
+--==================================================
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 34)
+titleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = panel
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -20, 1, 0)
+title.Position = UDim2.fromOffset(10, 0)
+title.BackgroundTransparency = 1
+title.Text = "Head Expander"
+title.TextColor3 = Color3.fromRGB(190, 190, 190)
+title.TextSize = 14
+title.Font = Enum.Font.Code
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+local titleLine = Instance.new("Frame")
+titleLine.Size = UDim2.new(1, -20, 0, 1)
+titleLine.Position = UDim2.fromOffset(10, 33)
+titleLine.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+titleLine.BorderSizePixel = 0
+titleLine.Parent = panel
+
+--==================================================
+-- COLUMN DIVIDER
+--==================================================
+
+local divider = Instance.new("Frame")
+divider.Size = UDim2.fromOffset(1, 185)
+divider.Position = UDim2.fromOffset(180, 43)
+divider.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+divider.BorderSizePixel = 0
+divider.Parent = panel
+
+--==================================================
+-- LEFT SIDE
+--==================================================
+
+local leftSide = Instance.new("Frame")
+leftSide.Name = "Sliders"
+leftSide.Size = UDim2.fromOffset(165, 190)
+leftSide.Position = UDim2.fromOffset(8, 43)
+leftSide.BackgroundTransparency = 1
+leftSide.Parent = panel
+
+--==================================================
+-- SLIDER CREATOR
+--==================================================
+
+local function createSlider(
+    parent,
+    y,
+    labelText,
+    minValue,
+    maxValue,
+    startingValue,
+    wholeNumbers,
+    callback
+)
+
+    local container = Instance.new("Frame")
+    container.Size = UDim2.fromOffset(155, 78)
+    container.Position = UDim2.fromOffset(0, y)
+    container.BackgroundTransparency = 1
+    container.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 22)
+    label.Position = UDim2.fromOffset(0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(185, 185, 185)
+    label.TextSize = 13
+    label.Font = Enum.Font.Code
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(1, 0, 0, 20)
+    valueLabel.Position = UDim2.fromOffset(0, 21)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.TextColor3 = Color3.fromRGB(155, 155, 155)
+    valueLabel.TextSize = 12
+    valueLabel.Font = Enum.Font.Code
+    valueLabel.TextXAlignment = Enum.TextXAlignment.Left
+    valueLabel.Text = tostring(startingValue)
+    valueLabel.Parent = container
+
+    local bar = Instance.new("TextButton")
+    bar.Size = UDim2.fromOffset(150, 7)
+    bar.Position = UDim2.fromOffset(0, 51)
+    bar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    bar.BorderSizePixel = 0
+    bar.Text = ""
+    bar.AutoButtonColor = false
+    bar.Parent = container
+
+    local barCorner = Instance.new("UICorner")
+    barCorner.CornerRadius = UDim.new(1, 0)
+    barCorner.Parent = bar
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new(
+        (startingValue - minValue) / (maxValue - minValue),
+        0,
+        1,
+        0
+    )
+    fill.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    fill.BorderSizePixel = 0
+    fill.Parent = bar
+
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(1, 0)
+    fillCorner.Parent = fill
+
+    local dragging = false
+
+    local function updateSlider(input)
+
+        local percentage = math.clamp(
+            (input.Position.X - bar.AbsolutePosition.X)
+            / bar.AbsoluteSize.X,
+            0,
+            1
+        )
+
+        local value =
+            minValue
+            + ((maxValue - minValue) * percentage)
+
+        if wholeNumbers then
+            value = math.round(value)
+        else
+            value = math.round(value * 10) / 10
+        end
+
+        local fillPercentage =
+            (value - minValue)
+            / (maxValue - minValue)
+
+        fill.Size = UDim2.new(
+            fillPercentage,
+            0,
+            1,
+            0
+        )
+
+        valueLabel.Text = tostring(value)
+
+        callback(value)
+    end
+
+    bar.InputBegan:Connect(function(input)
+
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            dragging = true
+            updateSlider(input)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+
+        if not dragging then
+            return
+        end
+
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            updateSlider(input)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            dragging = false
+        end
+    end)
+end
+
+-- Size
+createSlider(
+    leftSide,
+    5,
+    "SIZE",
+    1,
+    8,
+    HEAD_SIZE,
+    true,
+    function(value)
+        HEAD_SIZE = value
+    end
+)
+
+-- Transparency
+createSlider(
+    leftSide,
+    95,
+    "TRANSPARENCY",
+    0.1,
+    1,
+    HEAD_TRANSPARENCY,
+    false,
+    function(value)
+        HEAD_TRANSPARENCY = value
+    end
+)
+
+--==================================================
+-- RIGHT SIDE
+--==================================================
+
+local rightSide = Instance.new("Frame")
+rightSide.Name = "Buttons"
+rightSide.Size = UDim2.fromOffset(165, 190)
+rightSide.Position = UDim2.fromOffset(190, 43)
+rightSide.BackgroundTransparency = 1
+rightSide.Parent = panel
+
+--==================================================
+-- BUTTON CREATOR
+--==================================================
+
+local function createButton(y, text)
+
+    local button = Instance.new("TextButton")
+
+    button.Size = UDim2.fromOffset(160, 34)
+    button.Position = UDim2.fromOffset(0, y)
+
+    button.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+    button.BorderSizePixel = 0
+    button.Text = ""
+    button.AutoButtonColor = false
+    button.Parent = rightSide
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(60, 60, 60)
+    stroke.Thickness = 1
+    stroke.Parent = button
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 3)
+    corner.Parent = button
+
+    -- Label stays in a fixed position
+    local labelText = text:gsub(": ON$", ""):gsub(": OFF$", "")
+
+    local label = Instance.new("TextLabel")
+    label.Name = "Label"
+    label.Size = UDim2.new(1, -55, 1, 0)
+    label.Position = UDim2.fromOffset(10, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(190, 190, 190)
+    label.TextSize = 11
+    label.Font = Enum.Font.Code
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextYAlignment = Enum.TextYAlignment.Center
+    label.Parent = button
+
+    -- ON/OFF stays in exactly the same position
+    local status = Instance.new("TextLabel")
+    status.Name = "Status"
+    status.Size = UDim2.fromOffset(42, 34)
+    status.Position = UDim2.new(1, -50, 0, 0)
+    status.BackgroundTransparency = 1
+    status.Text = text:match("ON") and "ON" or "OFF"
+    status.TextColor3 = Color3.fromRGB(190, 190, 190)
+    status.TextSize = 11
+    status.Font = Enum.Font.Code
+    status.TextXAlignment = Enum.TextXAlignment.Right
+    status.TextYAlignment = Enum.TextYAlignment.Center
+    status.Parent = button
+
+    button.MouseEnter:Connect(function()
+        button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    end)
+
+    button.MouseLeave:Connect(function()
+        button.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+    end)
+
+    return button
+end
+
+local enableButton =
+    createButton(2, "Head Expander: ON")
+
+local teamButton =
+    createButton(47, "Team Check: ON")
+
+local knifeButton =
+    createButton(92, "AntiKnifeHBE: ON")
+
+local musketButton =
+    createButton(137, "AntiMusketHBE: ON")
+
+--==================================================
+-- TEAM CHECK
+--==================================================
+
+local function isSameTeam(player)
+
+    return player.Team ~= nil
+        and LocalPlayer.Team ~= nil
+        and player.Team == LocalPlayer.Team
+end
+
+--==================================================
+-- EQUIPPED WEAPONS
+--==================================================
+
+local function hasEquippedWeapon(name)
+
+    local character = LocalPlayer.Character
+
+    if not character then
+        return false
+    end
+
+    local tool = character:FindFirstChild(name)
+
+    return tool ~= nil and tool:IsA("Tool")
+end
+
+--==================================================
+-- SAVE ORIGINAL HEAD
+--==================================================
+
+local function saveOriginalHead(head)
+
+    if originalHeads[head] then
+        return
+    end
+
+    local meshes = {}
+
+    for _, child in ipairs(head:GetChildren()) do
+
+        if child:IsA("SpecialMesh") then
+            table.insert(meshes, child:Clone())
+        end
+    end
+
+    originalHeads[head] = {
+        Size = head.Size,
+        Transparency = head.Transparency,
+        Color = head.Color,
+        Material = head.Material,
+        CanCollide = head.CanCollide,
+        CanTouch = head.CanTouch,
+        Massless = head.Massless,
+        Meshes = meshes
+    }
+end
+
+--==================================================
+-- RESTORE HEAD
+--==================================================
+
+local function restoreHead(head)
+
+    local original = originalHeads[head]
+
+    if not original then
+        return
+    end
+
+    if head and head.Parent then
+
+        head.Size = original.Size
+        head.Transparency = original.Transparency
+        head.Color = original.Color
+        head.Material = original.Material
+
+        head.CanCollide = original.CanCollide
+        head.CanTouch = original.CanTouch
+        head.Massless = original.Massless
+
+        local blockMesh =
+            head:FindFirstChild("HeadExpanderBlockMesh")
+
+        if blockMesh then
+            blockMesh:Destroy()
+        end
+
+        for _, child in ipairs(head:GetChildren()) do
+
+            if child:IsA("SpecialMesh") then
+                child:Destroy()
+            end
+        end
+
+        for _, mesh in ipairs(original.Meshes) do
+            mesh:Clone().Parent = head
+        end
+    end
+
+    originalHeads[head] = nil
+end
+
+--==================================================
+-- APPLY EXPANDER
+--==================================================
+
+local function applyHeadChanges(head)
+
+    if not head or not head:IsA("BasePart") then
+        return
+    end
+
+    saveOriginalHead(head)
+
+    head.Size = Vector3.new(
+        HEAD_SIZE,
+        HEAD_SIZE,
+        HEAD_SIZE
+    )
+
+    -- Red
+    head.Color = Color3.fromRGB(255, 0, 0)
+
+    head.Transparency = HEAD_TRANSPARENCY
+    head.Material = Enum.Material.Neon
+
+    -- Prevent collision
+    head.CanCollide = false
+    head.CanTouch = false
+    head.Massless = true
+
+    -- Remove SpecialMesh
+    for _, child in ipairs(head:GetChildren()) do
+
+        if child:IsA("SpecialMesh") then
+            child:Destroy()
+        end
+    end
+
+    -- Make sure BlockMesh exists
+    local blockMesh =
+        head:FindFirstChild("HeadExpanderBlockMesh")
+
+    if not blockMesh then
+
+        blockMesh = Instance.new("BlockMesh")
+        blockMesh.Name = "HeadExpanderBlockMesh"
+        blockMesh.Parent = head
+    end
+
+    blockMesh.Scale = Vector3.new(1, 1, 1)
+end
+
+--==================================================
+-- PROCESS CHARACTER
+--==================================================
+
+local function processCharacter(player, character)
+
+    if player == LocalPlayer or not character then
+        return
+    end
+
+    local head = character:FindFirstChild("Head")
+
+    if not head or not head:IsA("BasePart") then
+        return
+    end
+
+    if not ENABLED then
+        restoreHead(head)
+        return
+    end
+
+    if TEAM_CHECK_ENABLED and isSameTeam(player) then
+        restoreHead(head)
+        return
+    end
+
+    if KNIFE_CHECK_ENABLED
+        and hasEquippedWeapon(KNIFE_NAME) then
+
+        restoreHead(head)
+        return
+    end
+
+    if MUSKET_CHECK_ENABLED
+        and hasEquippedWeapon(MUSKET_NAME) then
+
+        restoreHead(head)
+        return
+    end
+
+    applyHeadChanges(head)
+end
+
+--==================================================
+-- PLAYER SETUP
+--==================================================
+
+local function setupPlayer(player)
+
+    if player == LocalPlayer then
+        return
+    end
+
+    player.CharacterAdded:Connect(function(character)
+
+        task.defer(function()
+            processCharacter(player, character)
+        end)
+
+        character.ChildAdded:Connect(function(child)
+
+            if child:IsA("BasePart")
+                and child.Name == "Head" then
+
+                task.defer(function()
+                    processCharacter(player, character)
+                end)
+            end
+        end)
+    end)
+
+    player.CharacterAppearanceLoaded:Connect(function(character)
+
+        task.defer(function()
+            processCharacter(player, character)
+        end)
+    end)
+
+    player:GetPropertyChangedSignal("Team"):Connect(function()
+
+        local character = player.Character
+
+        if character then
+            processCharacter(player, character)
+        end
+    end)
+
+    if player.Character then
+
+        task.defer(function()
+            processCharacter(player, player.Character)
+        end)
+    end
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+    setupPlayer(player)
+end
+
+Players.PlayerAdded:Connect(setupPlayer)
+--==================================================
+-- HEAD EXPANDER BUTTON
+--==================================================
+
+enableButton.Activated:Connect(function()
+
+    ENABLED = not ENABLED
+
+    if ENABLED then
+
+        enableButton.Status.Text = "ON"
+
+    else
+
+        enableButton.Status.Text = "OFF"
+
+        -- Immediately restore all expanded heads
+        for head in pairs(originalHeads) do
+            restoreHead(head)
+        end
+    end
+end)
+
+--==================================================
+-- TEAM BUTTON
+--==================================================
+
+teamButton.Activated:Connect(function()
+
+    TEAM_CHECK_ENABLED = not TEAM_CHECK_ENABLED
+
+    teamButton.Status.Text =
+        TEAM_CHECK_ENABLED
+        and "ON"
+        or "OFF"
+
+    -- Immediately update everyone
+    for _, player in ipairs(Players:GetPlayers()) do
+
+        if player ~= LocalPlayer
+            and player.Character then
+
+            processCharacter(
+                player,
+                player.Character
+            )
+        end
+    end
+end)
+
+--==================================================
+-- KNIFE BUTTON
+--==================================================
+
+knifeButton.Activated:Connect(function()
+
+    KNIFE_CHECK_ENABLED =
+        not KNIFE_CHECK_ENABLED
+
+    knifeButton.Status.Text =
+        KNIFE_CHECK_ENABLED
+        and "ON"
+        or "OFF"
+
+    -- Immediately update
+    for _, player in ipairs(Players:GetPlayers()) do
+
+        if player ~= LocalPlayer
+            and player.Character then
+
+            processCharacter(
+                player,
+                player.Character
+            )
+        end
+    end
+end)
+
+--==================================================
+-- MUSKET BUTTON
+--==================================================
+
+musketButton.Activated:Connect(function()
+
+    MUSKET_CHECK_ENABLED =
+        not MUSKET_CHECK_ENABLED
+
+    musketButton.Status.Text =
+        MUSKET_CHECK_ENABLED
+        and "ON"
+        or "OFF"
+
+    -- Immediately update
+    for _, player in ipairs(Players:GetPlayers()) do
+
+        if player ~= LocalPlayer
+            and player.Character then
+
+            processCharacter(
+                player,
+                player.Character
+            )
+        end
+    end
+end)
+
+--==================================================
+-- OPEN / CLOSE GUI
+--==================================================
+
+toggle.Activated:Connect(function()
+
+    panel.Visible = not panel.Visible
+end)
+
+--==================================================
+-- DRAGGABLE TOGGLE
+--==================================================
+
+local draggingToggle = false
+local dragStart
+local toggleStartPosition
+
+toggle.InputBegan:Connect(function(input)
+
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        draggingToggle = true
+
+        dragStart = input.Position
+        toggleStartPosition = toggle.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+
+    if not draggingToggle then
+        return
+    end
+
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        local delta =
+            input.Position - dragStart
+
+        toggle.Position = UDim2.new(
+            toggleStartPosition.X.Scale,
+            toggleStartPosition.X.Offset + delta.X,
+            toggleStartPosition.Y.Scale,
+            toggleStartPosition.Y.Offset + delta.Y
+        )
+
+        -- Keep the window near the toggle
+        panel.Position = UDim2.new(
+            toggle.Position.X.Scale,
+            toggle.Position.X.Offset - 180,
+            toggle.Position.Y.Scale,
+            toggle.Position.Y.Offset + 55
+        )
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        draggingToggle = false
+    end
+end)
+
+--==================================================
+-- CONSTANT HEAD UPDATER
+--==================================================
+
+task.spawn(function()
+
+    while true do
+
+        local knifeBlocking =
+            KNIFE_CHECK_ENABLED
+            and hasEquippedWeapon(KNIFE_NAME)
+
+        local musketBlocking =
+            MUSKET_CHECK_ENABLED
+            and hasEquippedWeapon(MUSKET_NAME)
+
+        --==================================================
+        -- EXPANDER OFF
+        --==================================================
+
+        if not ENABLED then
+
+            for head in pairs(originalHeads) do
+                restoreHead(head)
+            end
+
+        --==================================================
+        -- ANTI-KNIFE / ANTI-MUSKET
+        --==================================================
+
+        elseif knifeBlocking or musketBlocking then
+
+            for head in pairs(originalHeads) do
+                restoreHead(head)
+            end
+
+        --==================================================
+        -- NORMAL UPDATE
+        --==================================================
+
+        else
+
+            for _, player in ipairs(Players:GetPlayers()) do
+
+                if player ~= LocalPlayer then
+
+                    local character = player.Character
+
+                    if character then
+
+                        local head =
+                            character:FindFirstChild("Head")
+
+                        if head and head:IsA("BasePart") then
+
+                            if TEAM_CHECK_ENABLED
+                                and isSameTeam(player) then
+
+                                restoreHead(head)
+
+                            else
+
+                                applyHeadChanges(head)
+
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        task.wait(UPDATE_INTERVAL)
+    end
+end)
